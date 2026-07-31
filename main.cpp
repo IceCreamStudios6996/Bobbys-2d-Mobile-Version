@@ -1,8 +1,14 @@
+/* 
+ * PROJECT: BOBBY'S STRIKE (MOBILE ENGINE)
+ * AUTHOR: Bentley
+ * PLATFORM: C++ / Raylib / WebAssembly
+ * DATE: 2026
+ */
+
 #include "raylib.h"
 #include "raymath.h"
 #include <vector>
 
-// --- GAME STATES ---
 enum GameState { 
     MENU,
     SHOP,
@@ -10,7 +16,6 @@ enum GameState {
     WIN 
 };
 
-// --- DATA STRUCTURES ---
 struct Bullet { 
     Vector2 pos; 
     Vector2 vel; 
@@ -23,17 +28,39 @@ struct Enemy {
     int hp;
 };
 
-// --- MAIN PROGRAM ---
-int main() {
-    const int screenWidth = 1280;
-    const int screenHeight = 720;
+int screenWidth = 1280;
+int screenHeight = 720;
+int kills = 0;
+GameState state = MENU;
+Vector2 bobbyPos;
+Vector2 bobbyVel;
+std::vector<Bullet> bullets;
+std::vector<Enemy> enemies;
+Color currentMapColor = DARKGRAY;
+float friction = 0.85f;
+
+void ResetGame() {
+    kills = 0;
+    bobbyPos = { (float)screenWidth/2, (float)screenHeight/2 };
+    bobbyVel = { 0, 0 };
+    bullets.clear(); 
     
-    InitWindow(screenWidth, screenHeight, "Bobby's 2D Strike: BUG FIX 3.1");
+    enemies.clear();
+    for (int i = 0; i < 6; i++) {
+        enemies.push_back({ 
+            {(float)GetRandomValue(0, screenWidth), (float)GetRandomValue(0, screenHeight)},
+            true,
+            3
+        });
+    }
+}
+
+int main() {
+    InitWindow(screenWidth, screenHeight, "Bobby's 2D Strike: SOURCE");
     InitAudioDevice(); 
 
     SetTargetFPS(60);
 
-    // AUDIO
     Wave wavePew = GenWaveSquare(44100, 440.0f, 0.1f);
     Sound sfxShoot = LoadSoundFromWave(wavePew);
     SetSoundVolume(sfxShoot, 0.5f);
@@ -45,40 +72,20 @@ int main() {
     UnloadWave(wavePew);
     UnloadWave(waveBoom);
 
-    GameState state = MENU;
-    int kills = 0;
-    
     float shakeTime = 0.0f;
     Camera2D cam = { 0 };
     cam.zoom = 1.0f;
     cam.offset = { screenWidth/2.0f, screenHeight/2.0f };
     cam.target = { screenWidth/2.0f, screenHeight/2.0f };
 
-    Color currentMapColor = DARKGRAY;
-    float friction = 0.85f;
-    Vector2 bobbyPos = { screenWidth/2.0f, screenHeight/2.0f };
-    Vector2 bobbyVel = { 0, 0 };
-    float acceleration = 1.2f; 
-    
     Color mySkin = BLUE;
     float mySize = 25.0f; 
-    const char* skinName = "Default Blue";
+    float acceleration = 1.2f; 
 
-    std::vector<Bullet> bullets;
-    std::vector<Enemy> enemies;
-    
-    // SPAWN LOGIC
-    for (int i = 0; i < 6; i++) {
-        enemies.push_back({ 
-            {(float)GetRandomValue(0, screenWidth), (float)GetRandomValue(0, screenHeight)},
-            true,
-            3
-        });
-    }
+    ResetGame();
 
     while (!WindowShouldClose()) {
         
-        // SHAKE LOGIC
         if (shakeTime > 0) {
             shakeTime -= 1.0f;
             cam.offset.x = (screenWidth/2.0f) + GetRandomValue(-10, 10);
@@ -92,8 +99,9 @@ int main() {
         if (state == MENU) {
             BeginDrawing();
             ClearBackground(BLACK);
-            DrawText("BOBBY'S STRIKE", screenWidth/2 - 200, 100, 60, WHITE);
-            DrawText("BUG FIX EDITION", screenWidth/2 - 150, 160, 30, GREEN);
+            DrawText("BOBBY'S STRIKE", screenWidth/2 - 220, 100, 60, WHITE);
+            DrawText("C++ MOBILE ENGINE", screenWidth/2 - 150, 170, 30, YELLOW);
+            DrawText("TAP A MAP TO START", screenWidth/2 - 140, 220, 20, GRAY);
 
             DrawRectangle(screenWidth/2 - 300, 300, 250, 150, BEIGE);
             DrawText("DUST II", screenWidth/2 - 240, 350, 30, DARKBROWN);
@@ -102,6 +110,8 @@ int main() {
             DrawText("ICE WORLD", screenWidth/2 + 100, 350, 30, WHITE);
 
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
+                PlaySound(sfxShoot); 
+                
                 Vector2 t = GetMousePosition();
                 if (t.x > screenWidth/2 - 300 && t.x < screenWidth/2 - 50 && t.y > 300 && t.y < 450) {
                     currentMapColor = BEIGE; friction = 0.85f; state = GAME;
@@ -134,9 +144,11 @@ int main() {
             if (IsMouseButtonReleased(MOUSE_BUTTON_LEFT)) {
                 Vector2 t = GetMousePosition();
                 t = GetScreenToWorld2D(t, cam);
+                
                 Vector2 aim = Vector2Normalize(Vector2Subtract(t, bobbyPos));
                 bullets.push_back({ bobbyPos, Vector2Scale(aim, 18.0f), true }); 
                 bobbyVel = Vector2Subtract(bobbyVel, Vector2Scale(aim, 5.0f)); 
+                
                 PlaySound(sfxShoot); 
             }
 
@@ -169,6 +181,7 @@ int main() {
 
             BeginDrawing();
             ClearBackground(currentMapColor);
+            
             BeginMode2D(cam); 
             for(int x=0; x<screenWidth; x+=100) DrawLine(x, 0, x, screenHeight, Fade(BLACK, 0.2f));
             for(int y=0; y<screenHeight; y+=100) DrawLine(0, y, screenWidth, y, Fade(BLACK, 0.2f));
@@ -184,6 +197,7 @@ int main() {
             DrawCircleV(bobbyPos, mySize, mySkin);
             for (auto &b : bullets) if (b.active) DrawCircleV(b.pos, 8, YELLOW);
             EndMode2D(); 
+
             DrawText(TextFormat("KILLS: %i / 10", kills), 30, 30, 40, BLACK);
             EndDrawing();
         }
@@ -191,23 +205,12 @@ int main() {
         else if (state == WIN) {
             BeginDrawing();
             ClearBackground(WHITE);
-            DrawText("MISSION COMPLETE", screenWidth/2 - 200, screenHeight/2 - 50, 50, GREEN);
-            DrawText("Tap to Restart", screenWidth/2 - 100, screenHeight/2 + 10, 30, GRAY);
+            DrawText("MISSION COMPLETE", screenWidth/2 - 250, screenHeight/2 - 50, 50, GREEN);
+            DrawText("Tap to Restart", screenWidth/2 - 120, screenHeight/2 + 20, 30, GRAY);
             EndDrawing();
             
             if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                // RESET PLAYER
-                kills = 0; 
-                bobbyVel = {0,0}; 
-                bobbyPos = {screenWidth/2.0f, screenHeight/2.0f};
-                
-                // *** THE FIX: RESET ENEMIES ***
-                for (auto &e : enemies) {
-                    e.active = true;
-                    e.hp = 3;
-                    e.pos = { (float)GetRandomValue(0, screenWidth), (float)GetRandomValue(0, screenHeight) };
-                }
-                
+                ResetGame();
                 state = MENU;
             }
         }
